@@ -3,7 +3,7 @@ Geometric analysis utilities for computing Fisher information and curvature tens
 """
 import jax
 import jax.numpy as jnp
-from jax import jacrev, vmap
+from jax import jacrev, vmap, grad
 from jax.flatten_util import ravel_pytree
 import numpy as np
 from model import forward
@@ -111,7 +111,7 @@ def christoffel_symbols_NEW(dg, g_inv):
     christ = 0.5 * jnp.einsum('sr, mnr -> smn', g_inv, sum_partial_derivs)
     return christ
 
-
+@jax.jit
 def riemann_curvature(Gamma, dGamma):
     """Compute the Riemann curvature tensor."""
     dGamma = jnp.einsum('rmns -> srmn', dGamma) # Rearranging indices because when we differentiate we get the extra index at the END
@@ -121,7 +121,7 @@ def riemann_curvature(Gamma, dGamma):
     term4 = jnp.einsum('rnl, lms -> rsmn', Gamma, Gamma)
     return term1 - term2 + term3 - term4
 
-
+@jax.jit
 def ricci_tensor(Gamma, dGamma):
     """Compute the Ricci tensor."""
     riemann = riemann_curvature(Gamma, dGamma)
@@ -238,31 +238,26 @@ def compute_ricci_tensor_from_fisher(params, x, constant_V=None, constant_V_T=No
 
     # ---- Reduced Space Fisher matrix ----
     @jax.jit
-    def fisher_reduced(reduced_params, x_data): #change so that it does the projection internally
-        
-        # Get the full parameters from the reduced ones
-        full_params = projection_matrix @ reduced_params
-        
-        # Use the same function as before to compute Fisher on full params
-        def log_probs_fn_reduced(full_p, x_i, c):
-            params_dict = unravel_fn(full_p)
-            probs = forward(params_dict, x_i.reshape(1, -1)).squeeze()
-            return jnp.log(probs[c])
-            
-        def per_sample_fisher_red(full_p, x_i):
-            p_i = forward(unravel_fn(full_p), x_i.reshape(1, -1)).squeeze()
-            contrib = jnp.zeros((full_p.shape[0], full_p.shape[0]))
-            for c in range(num_classes):
-                J_c = jacrev(log_probs_fn_reduced)(full_p, x_i, c)
-                contrib += p_i[c] * jnp.outer(J_c, J_c)
-            return contrib
-            
-        # Compute Fisher in full space
-        fisher_samples_red = vmap(per_sample_fisher_red, in_axes=(None, 0))(full_params, x_data)
-        full_fisher = jnp.mean(fisher_samples_red, axis=0)
-        
-        # Project back to reduced space: V_T * G * V
-        return projection_matrix_T @ full_fisher @ projection_matrix
+    def reparam_model(reduced_params):
+        full_params_flat = projection_matrix @ reduced_params  # shape (N,)
+        return unravel_fn(full_params_flat)
+
+    def log_prob_reduced(reduced_params, x_i, c):
+        params_dict = reparam_model(reduced_params)
+        probs = forward(params_dict, x_i.reshape(1, -1)).squeeze()
+        return jnp.log(probs[c])
+
+    def per_sample_fisher_reduced(reduced_params, x_i):
+        p_i = forward(reparam_model(reduced_params), x_i.reshape(1, -1)).squeeze()
+        contrib = jnp.zeros((reduced_params.shape[0], reduced_params.shape[0]))
+        for c in range(num_classes):
+            J_c = grad(log_prob_reduced)(reduced_params, x_i, c)
+            contrib += p_i[c] * jnp.outer(J_c, J_c)
+        return contrib
+
+    @jax.jit
+    def fisher_reduced(reduced_params, x_data):
+        return jnp.mean(vmap(per_sample_fisher_reduced, in_axes=(None, 0))(reduced_params, x_data), axis=0)
 
     # Step 2: Reduce dimensionality of the Fisher matrix
     fisher_np = np.array(fisher_internal(flat_params, x))
