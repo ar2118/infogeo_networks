@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 from matplotlib.ticker import FuncFormatter
-
 from config import RANK_TOL 
 from geometry import fisher
 
 
 def plot_comprehensive(params, X, y, loss_history, acc_history, ricci_history, 
-                      rank_history, epochs_list, eigenvalues, output_dir, kretschmann_history, weyl_history, size=7, **kwargs):
+                       rank_history, epochs_list, eigenvalues, output_dir, 
+                       kretschmann_history, weyl_history, size=7, **kwargs):
     """Generate and save individual square plots at 500 dpi in PDF format."""
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
