@@ -170,15 +170,18 @@ def compute_ricci_tensor_from_fisher(params, x):
 
         return fisher_matrix
     
-    # Compute the Fisher matrix without redundant parameters
+    # Get my reduced parameters (without redundancies)
     params_reduced, params_frozen = split_params(params)
     flat_reduced, unravel_reduced = ravel_pytree(params_reduced)
+
+    # Calculate REDUCED Fisher matrix, its invers and its derivative with respect to the reduced parameters
     g = fisher_function_for_differentiation(flat_reduced, params_frozen, unravel_reduced, x)
     g = (g + g.T) / 2 # Ensure symmetry in case of small numerical precision errors, this isn't even that needed and I have checked (they blow up a bit sometimes though)
     g_inv = jnp.linalg.inv(g)
     g_inv = (g_inv + g_inv.T) / 2
     dg = jacrev(fisher_function_for_differentiation)(flat_reduced, params_frozen, unravel_reduced, x)  # shape (d, d, d)
 
+    # Make a function for christoffel symbols so that I can use it in the derivatives using jacrev
     def Gamma_from_dg_ginv(dg, g_inv):
         return christoffel_symbols_NEW(dg, g_inv)  # shape (d, d, d)
     
