@@ -4,6 +4,8 @@ import os
 from datetime import datetime
 from matplotlib.ticker import FuncFormatter
 from config import RANK_TOL 
+import scienceplots 
+plt.style.use(['science', 'no-latex'])
 from geometry import fisher
 
 

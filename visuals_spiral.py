@@ -7,29 +7,36 @@ import matplotlib.animation as animation
 import os
 from datetime import datetime
 from config import RANK_TOL as rank_tol
-from geometry import fisher
+from geometry import fisher_reduced
+import scienceplots 
+plt.style.use(['science', 'no-latex'])
 from model import forward
 
 
 def plot_comprehensive(params, X, y, centers, colors, loss_history, acc_history, ricci_history, 
-                      rank_history, epochs_list, eigenvalues, output_dir, kretschmann_history, 
-                      weyl_history, size=7, **kwargs):
+                      rank_history, epochs_list, eigenvalues, output_dir, kretschmann_history, weyl_history, size=7, **kwargs):
     """Generate and save individual square plots at 500 dpi in PDF format."""
+    
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import os
+    from datetime import datetime
+    from matplotlib.ticker import FuncFormatter
     
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    def save_square_plot(x, y, title, xlabel, ylabel, filename, logscale=False, hline=None, 
-                         dots=None):
+    def save_square_plot(x, y, title, xlabel, ylabel, filename, logscale=False, hline=None, symlog=False, 
+                         dots=None, linthresh=1.0, custom_ticks=False):
         fig, ax = plt.subplots(figsize=(size, 5))
             
         if logscale:
-            ax.semilogy(x, y, '-', linewidth=1.5, alpha=0.7, color='darkblue')
+            ax.semilogy(x, y, '-', linewidth=1.5, alpha=0.7, color='darkblue')  # Line plot for logscale
         else:
-            ax.plot(x, y, '-', linewidth=1.5, color='darkblue')
+            ax.plot(x, y, '-', linewidth=1.5, color='darkblue')  # Line plot
             
         if hline is not None:
             ax.axhline(y=hline[0], color=hline[1], linestyle='--', label=hline[2])
-            ax.legend(fontsize=14)
+            ax.legend(fontsize=14)  # Set legend font size
             
         if dots is not None:
             if logscale:
@@ -38,9 +45,9 @@ def plot_comprehensive(params, X, y, centers, colors, loss_history, acc_history,
                 ax.plot(np.arange(len(x)), y, 'o-', color='darkblue')
 
         ax.set_title(title, fontsize=14)
-        ax.set_xlabel(xlabel, fontsize=12)
-        ax.set_ylabel(ylabel, fontsize=12)
-        ax.tick_params(axis='both', labelsize=14)
+        ax.set_xlabel(xlabel, fontsize=12)  # Set x-axis font size
+        ax.set_ylabel(ylabel, fontsize=12)  # Set y-axis font size
+        ax.tick_params(axis='both', labelsize=14)  # Set tick label font size
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
         fig.savefig(os.path.join(output_dir, f"{filename}_{timestamp}.pdf"), dpi=500, bbox_inches='tight')
@@ -73,33 +80,33 @@ def plot_comprehensive(params, X, y, centers, colors, loss_history, acc_history,
                      logscale=True,
                      hline=(rank_tol, 'r', f'Tol = {rank_tol:.0e}'), dots=True)
 
-    # 5. Fisher Matrix Heatmap
-    fisher_matrix = fisher(params, X)
+    # 5. Heatmap (special case)
+    fisher_matrix = fisher_reduced(params, X)
     fig, ax = plt.subplots(figsize=(5, 5))
     im = ax.imshow(np.log10(np.abs(fisher_matrix) + 1e-16),
                    cmap='viridis', interpolation='nearest')
     ax.set_title("Fisher Information Matrix (Log10 Scale)", fontsize=14)
-    ax.tick_params(axis='both', labelsize=14)
+    ax.tick_params(axis='both', labelsize=14)  # Set tick label font size
     fig.colorbar(im, ax=ax)
     fig.tight_layout()
     fig.savefig(os.path.join(output_dir, f"plot_fisher_heatmap_{timestamp}.pdf"), dpi=500, bbox_inches='tight')
     plt.close(fig)
 
-    # 6. Ricci Scalar
+
     save_square_plot(epochs_list, np.abs(ricci_history),
-                     title="Ricci Scalar (Log Scale, Negative Values)",
-                     xlabel="Epochs", ylabel="Ricci Scalar (Log Scale)",
-                     filename="plot_ricci",
-                     logscale=True)
+                         title="Ricci Scalar (Log Scale, Negative Values)",
+                         xlabel="Epochs", ylabel="Ricci Scalar (Log Scale)",
+                         filename="plot_ricci",
+                         logscale=True)
     
-    # 7. Kretschmann Scalar
+    # 7. Kretschmann Scalar with log scale
     save_square_plot(epochs_list, kretschmann_history,
                      title="Kretschmann Scalar",
                      xlabel="Epochs", ylabel="Kretschmann Scalar (Log Scale)",
                      filename="plot_kretschmann",
                      logscale=True)
 
-    # 8. Weyl Scalar
+    # 8. Weyl Scalar with log scale
     save_square_plot(epochs_list, weyl_history,
                      title="Weyl Scalar",
                      xlabel="Epochs", ylabel="Weyl Scalar (Log Scale)",
@@ -145,16 +152,17 @@ def plot_comprehensive(params, X, y, centers, colors, loss_history, acc_history,
     # Add legend
     legend_elements = [
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red',
-                   markersize=10, label='Class 0 [1,0]'),
+                   markersize=10, label='Class 0 [0,1]'),
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='blue',
-                   markersize=10, label='Class 1 [0,1]')
+                   markersize=10, label='Class 1 [1,0]')
     ]
     ax_decision.legend(handles=legend_elements, fontsize=10)
 
     fig.tight_layout()
-    fig.savefig(os.path.join(output_dir, f"plot_decision_and_fisher_{timestamp}.pdf"),
+    fig.savefig(os.path.join(output_dir, f"plot_decision_{timestamp}.pdf"),
                 dpi=500, bbox_inches='tight')
     plt.close(fig)
+
 
 
 def show_all_plots_together(loss_history, acc_history, rank_history, epochs_list,

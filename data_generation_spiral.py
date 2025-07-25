@@ -51,14 +51,5 @@ def generate_spiral_data(n_total=NUMBER_POINTS_ON_SPIRAL, noise=0.05, seed=0):
 
 
 def subsample_x(x, max_points):
-    """
-    Subsample data points for Ricci computation.
-    
-    Args:
-        x: Input data
-        max_points: Maximum number of points to keep
-        
-    Returns:
-        Subsampled data
-    """
+
     return x[:max_points]
